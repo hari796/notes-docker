@@ -75,3 +75,47 @@ The <CONTAINER_ID> can be found in the list of running containers using the comm
 sudo docker container ls (--all)
 ```
 The --all (-a) argument will list a history of containers stopped or running
+
+## Sharing the Image
+
+The image can be shared in a Registry, that is a collection of Repositories, that is a collection of docker images.
+
+Docker already provides a [cloud Registry](https://cloud.docker.com) but there are many other ones that can be used
+
+Is possible to login using the docker CLI using the command
+```
+sudo docker login
+```
+It will ask for the account login and password
+
+### Tag the Image
+
+Is used to link a local image with a repository
+```
+sudo docker tag <image_name> <username>/<repository>:<tag>
+
+Example:
+sudo docker tag image pedro00dk/notes-docker:app
+```
+The [docker image ls]() will show the tagged images too
+
+### Publish the Image
+
+The app can be published with the command
+```
+docker push <username>/<repository>:<tag>
+
+Example:
+sudo docker tag image pedro00dk/notes-docker:app
+```
+When the command ends, the app will be available in the docker cloud
+
+### Pull and run the image from the remote repository
+
+```
+docker run -p 4000:80 <username>/<repository>:<tag>
+
+Example:
+sudo docker run -p 4000:80 pedro00dk/notes-docker:app
+```
+If the published image isn't available locally, it will pull then run it

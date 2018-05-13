@@ -61,11 +61,16 @@ sudo docker image ls
 
 The container is the image running, to start it, I used the <image_name> set in the image creation, with the command
 ```
-sudo docker run -p 4000:80 <image_name>
+sudo docker run -d -p 4000:80 <image_name>
 ```
 The -p argument maps a host port to the exposed port set in the Dockerfile
 
-The running containers can be listed using the command
+The -d argument is used to run the container detached from terminal, it still can be stopped with the command
+```
+sudo docker container stop <CONTAINER_ID>
+```
+
+The <CONTAINER_ID> can be found in the list of running containers using the command
 ```
 sudo docker container ls (--all)
 ```

@@ -395,3 +395,39 @@ To redeploy the stack, just run the stack deploy command again
 docker stack deploy -c docker-compose.yml
 ```
 This added service is an open-source project from Docker, used to display the services running in its swarm using a diagram such as [docker stack ps <stack_name>]()
+
+### [Redis](https://redis.io/) (persisting the data)
+
+Add a redis service in the docker-compose
+```
+  redis:
+    image: redis
+    ports:
+      - "6379:6379"
+    volumes:
+        # like the visualizer service, it maps the host /home/docker/data path to the VM /data path 
+      - "/home/docker/data:/data"
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    command: redis-server --appendonly yes
+    networks:
+      - webnet
+```
+Redis has an official image in the Docker library and has been granted the short image name of just redis, so no username/repo
+
+The port 6379 has been pre-configured by Redis to be exposed from the container to the host, and it's exposed from host to world with the same number
+
+Details about Redis image:
+* redis always runs on the manager, so it’s always using the same filesystem
+* redis accesses an arbitrary directory in the host’s file system as ```/data``` inside the container, which is where Redis stores data
+
+The ```/data``` foldar folder needs to be created in the swarm manager VM with the command
+```
+docker-machine ssh <leader_vm> "mkdir ./data"
+# <leader_vm> is the swarm manager vm, in this case, vm0
+```
+After that, redeploy the application
+```
+docker stack deploy -c docker-compose.yml
+```

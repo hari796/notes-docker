@@ -362,3 +362,36 @@ n28cbv4zvezm        stackbalancedapp_web.5   pedro00dk/notes-docker:app   vm1   
 
 ```
 After a [docker swarm join]() the command [docker stack deploy]() shall be called again, it will enable the new resources (nodes) for the app
+
+## Stack
+
+Is a group of services with shared dependencies that can be scaled together by a swarm manager
+
+### Add new service and redeploy
+
+New services can be added in the docker-compose file
+```yml
+    # The web service (already exists)
+    web:
+        ...
+    # New visualizer service
+    visualizer:
+        image: dockersamples/visualizer:stable
+        ports:
+            - "8080:8080"
+        # volumes is a new key that gives access to host socket file
+        volumes:
+            - "/var/run/docker.sock:/var/run/docker.sock"
+        # deploy already exists in the web service but not the placement key
+        deploy:
+            # this key value ensures that this service only ever runs on the swarm manager node
+            placement:
+                constraints: [node.role == manager]
+        networks:
+            - webnet
+```
+To redeploy the stack, just run the stack deploy command again
+```
+docker stack deploy -c docker-compose.yml
+```
+This added service is an open-source project from Docker, used to display the services running in its swarm using a diagram such as [docker stack ps <stack_name>]()

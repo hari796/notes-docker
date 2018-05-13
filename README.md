@@ -226,19 +226,30 @@ sudo docker swarm join --token SWMTKN-1-3uyckzgn9ib8w4kl6hwnjgv7cs7f767prenexvij
 ### Creating swarm cluster with VMs
 
 With docker-machine it's possible to create VMs and connect then as nodes in a swarm.
+
+The superuser privileges were not needed for docker-machine and for commands executed in the created vms
+
 ```
-sudo docker-machine create --driver <driver_name> <machine_name>
+docker-machine create --driver <driver_name> <machine_name>
 
 Example:
-sudo docker-machine create --driver virtualbox vm0
-sudo docker-machine create --driver virtualbox vm1
+docker-machine create --driver virtualbox vm0
+docker-machine create --driver virtualbox vm1
 ```
 The <driver_name> is the type of the VM [backend](https://docs.docker.com/machine/drivers/).
 The <machine_name> is the identifier for the VM
 
+The machines are created and already set to start running, if they are stopped (reboot or logoff), they can be restarted with the command
+```
+docker-machine start <machine-name>
+
+# If already running
+docker-machine restart <machine-name>
+```
+
 The VMs can be listed with the command, it will show their IP addresses too, theses addresses will be used to connect the VMs to the swarm
 ```
-sudo docker-machine ls
+docker-machine ls
 
 Output:
 NAME   ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER        ERRORS
@@ -249,14 +260,14 @@ For more info about docker machines check enter [here](https://docs.docker.com/m
 
 Is possible to run shell commands in the VMs using the following command
 ```
-sudo docker-machine ssh <machine_name> <command>
+docker-machine ssh <machine_name> <command>
 
 Example:
-sudo docker-machine ssh vm0 "uname -a"
+docker-machine ssh vm0 "uname -a"
 Output:
 Linux vm0 4.9.93-boot2docker #1 SMP Thu May 10 16:27:54 UTC 2018 x86_64 GNU/Linux
 
-sudo docker-machine ssh vm0 "docker swarm init --advertise-addr 192.168.99.100"
+docker-machine ssh vm0 "docker swarm init --advertise-addr 192.168.99.100"
 Output:
 Swarm initialized: current node (re2s0tlpw4o146xhjw920xdna) is now a manager.
 
@@ -267,7 +278,7 @@ To add a worker to this swarm, run the following command:
 To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
 
 
-sudo docker-machine ssh vm1 "docker swarm join --token SWMTKN-1-20uubklicjyiax1w5g2kumf2ofzuapw02n8fl9iobpen5847ii-5mqzrru7khwm0v3dewkqdj4ms 192.168.99.100:2377"
+docker-machine ssh vm1 "docker swarm join --token SWMTKN-1-20uubklicjyiax1w5g2kumf2ofzuapw02n8fl9iobpen5847ii-5mqzrru7khwm0v3dewkqdj4ms 192.168.99.100:2377"
 Output:
 This node joined a swarm as a worker.
 ```
@@ -276,18 +287,78 @@ The configuration above has *vm0* as swarm manager and *vm1* as a worker
 
 Is possible to add other swarm managers with the command
 ```
-sudo docker swarm <token> manager
+docker swarm <token> manager
 ```
 
 Is possible to check the current nodes in the swarm cluster from the swarm manager using the command
 ```
-sudo docker node ls
+docker node ls
 
 Example:
-sudo docker-machine ssh <leader_vm> "docker node ls"
+docker-machine ssh <leader_vm> "docker node ls"
 Output:
 ID                            HOSTNAME            STATUS              AVAILABILITY        MANAGER STATUS      ENGINE VERSION
 re2s0tlpw4o146xhjw920xdna *   vm0                 Ready               Active              Leader              18.05.0-ce
 5axe8boj1zrzylty7odyykov7     vm1                 Ready               Active                                  18.05.0-ce
 ```
 If this command is executed in a worker machine, it will end with error
+
+## Deploy app on swarm cluster
+
+To deploy the application on the swarm, is just repeat the commands used to deploy on the host machine for the swarm manager VM.
+
+### Configure shell talk directly with VM (swarm manager)
+
+The commands can be sent to the swarm manager VM by wrapping then with [docker-machine <machine_name> ssh command]() but another option is
+```
+docker-machine env <machine_name> # vm0
+Output:
+export DOCKER_TLS_VERIFY="1"
+export DOCKER_HOST="tcp://192.168.99.100:2376"
+export DOCKER_CERT_PATH="/root/.docker/machine/machines/vm0"
+export DOCKER_MACHINE_NAME="vm0"
+# Run this command to configure your shell:
+# eval $(docker-machine env vm0)
+
+Run last line to make the shell talk to the vm
+eval $(docker-machine env vm0)
+
+sudo docker-machine ls
+Output:
+NAME   ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER        ERRORS
+vm0    *        virtualbox   Running   tcp://192.168.99.100:2376           v18.05.0-ce
+vm1    -        virtualbox   Running   tcp://192.168.99.101:2376           v18.05.0-ce
+```
+
+To unset shell connection with VM run the command
+
+```
+ eval $(docker-machine env -u)
+```
+
+### Deploy app to swarm manager
+
+With the shell talking directly with the active VM (swarm manager) is possible to easily execute commands in the VM (commands on VM don't need superuser privileges)
+```
+docker stack deploy -c docker-compose.yml <stack_name>
+
+Example:
+docker stack deploy -c docker-compose.yml stackbalancedapp
+```
+
+After that, the service address will not be the localhost, but any of the VMs addresses running the service, that can be obtained through [docker-machine ls]()
+
+Is possible to check all containers (tasks) running on the machines (nodes) with the command
+```
+docker stack ps <stack_name>
+
+Output:
+ID                  NAME                     IMAGE                        NODE                DESIRED STATE       CURRENT STATE            ERROR               PORTS
+u82ne8hu33jf        stackbalancedapp_web.1   pedro00dk/notes-docker:app   vm0                 Running             Running 18 minutes ago                       
+jowukynkbpcu        stackbalancedapp_web.2   pedro00dk/notes-docker:app   vm1                 Running             Running 18 minutes ago                       
+xow7j2g8wd6g        stackbalancedapp_web.3   pedro00dk/notes-docker:app   vm1                 Running             Running 18 minutes ago                       
+p6yc027u1q6d        stackbalancedapp_web.4   pedro00dk/notes-docker:app   vm0                 Running             Running 18 minutes ago                       
+n28cbv4zvezm        stackbalancedapp_web.5   pedro00dk/notes-docker:app   vm1                 Running             Running 18 minutes ago   
+
+```
+After a [docker swarm join]() the command [docker stack deploy]() shall be called again, it will enable the new resources (nodes) for the app

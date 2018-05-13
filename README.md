@@ -198,3 +198,96 @@ Stop the swarm
 ```
 docker swarm leave --force
 ```
+
+## Swarm Clusters
+
+Swarm is a group of machines running docker joined into a cluster, the docker commands can be executed on a cluster, they are managed by the **swarm manager**. The swarm machines can be physical or virtual, in a swarm, these machines are referred to as **nodes**, the swarm manager is one of these nodes too, and is the only that can execute the user commands, the other nodes are called **workers**, the workers have no authority and can be recruited by the swarm manager.
+
+The swarm managers can use  some strategies to run containers (tasks) in the machines (nodes), these strategies can be set in the docker-compose file
+
+### Set up the swarm
+
+All the tasks except by the last (start the stack of services) were running in the **single-host mode**, but docker can also be switched to  **swarm mode**.
+```
+sudo docker swarm init
+```
+Enabling the use of swarm instantly makes the current machine a swarm manager. From now on, all commands will run on the swarm, and not only in the current machine
+
+This command will provide the token, address and port used by workers to join the swarm
+
+The command to add other machines as workers on the swarm is
+```
+sudo docker swarm join --token <token> <address>:<port>
+
+Example:
+sudo docker swarm join --token SWMTKN-1-3uyckzgn9ib8w4kl6hwnjgv7cs7f767prenexvijd3g71fq521-emp8z49leutyvxasxkici58il 192.168.1.11:2377
+```
+
+### Creating swarm cluster with VMs
+
+With docker-machine it's possible to create VMs and connect then as nodes in a swarm.
+```
+sudo docker-machine create --driver <driver_name> <machine_name>
+
+Example:
+sudo docker-machine create --driver virtualbox vm0
+sudo docker-machine create --driver virtualbox vm1
+```
+The <driver_name> is the type of the VM [backend](https://docs.docker.com/machine/drivers/).
+The <machine_name> is the identifier for the VM
+
+The VMs can be listed with the command, it will show their IP addresses too, theses addresses will be used to connect the VMs to the swarm
+```
+sudo docker-machine ls
+
+Output:
+NAME   ACTIVE   DRIVER       STATE     URL                         SWARM   DOCKER        ERRORS
+vm0    -        virtualbox   Running   tcp://192.168.99.100:2376           v18.05.0-ce
+vm1    -        virtualbox   Running   tcp://192.168.99.101:2376           v18.05.0-ce
+```
+For more info about docker machines check enter [here](https://docs.docker.com/machine/overview/)
+
+Is possible to run shell commands in the VMs using the following command
+```
+sudo docker-machine ssh <machine_name> <command>
+
+Example:
+sudo docker-machine ssh vm0 "uname -a"
+Output:
+Linux vm0 4.9.93-boot2docker #1 SMP Thu May 10 16:27:54 UTC 2018 x86_64 GNU/Linux
+
+sudo docker-machine ssh vm0 "docker swarm init --advertise-addr 192.168.99.100"
+Output:
+Swarm initialized: current node (re2s0tlpw4o146xhjw920xdna) is now a manager.
+
+To add a worker to this swarm, run the following command:
+
+    docker swarm join --token SWMTKN-1-20uubklicjyiax1w5g2kumf2ofzuapw02n8fl9iobpen5847ii-5mqzrru7khwm0v3dewkqdj4ms 192.168.99.100:2377
+
+To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+
+
+sudo docker-machine ssh vm1 "docker swarm join --token SWMTKN-1-20uubklicjyiax1w5g2kumf2ofzuapw02n8fl9iobpen5847ii-5mqzrru7khwm0v3dewkqdj4ms 192.168.99.100:2377"
+Output:
+This node joined a swarm as a worker.
+```
+The created VMs already contains docker installed, so they can be configured as swarm managers or workers, configurations like the host machine as swarm manager and VMs as workers are possible too.
+The configuration above has *vm0* as swarm manager and *vm1* as a worker
+
+Is possible to add other swarm managers with the command
+```
+sudo docker swarm <token> manager
+```
+
+Is possible to check the current nodes in the swarm cluster from the swarm manager using the command
+```
+sudo docker node ls
+
+Example:
+sudo docker-machine ssh <leader_vm> "docker node ls"
+Output:
+ID                            HOSTNAME            STATUS              AVAILABILITY        MANAGER STATUS      ENGINE VERSION
+re2s0tlpw4o146xhjw920xdna *   vm0                 Ready               Active              Leader              18.05.0-ce
+5axe8boj1zrzylty7odyykov7     vm1                 Ready               Active                                  18.05.0-ce
+```
+If this command is executed in a worker machine, it will end with error
